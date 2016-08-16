@@ -4,6 +4,10 @@ var defaultCorsHeaders = {
   'access-control-allow-headers': 'content-type, accept',
   'access-control-max-age': 10 // Seconds.
 };
+
+var fs = require('fs');
+var path = require('path');
+
 /*************************************************************
 
 You should implement your request handler function in this file.
@@ -17,9 +21,27 @@ this file and include it in basic-server.js so that it actually works.
 *Hint* Check out the node module documentation at http://nodejs.org/api/modules.html.
 
 **************************************************************/
-var resultsObject = {results: [{objectId: '0', roomname: 'lobby', username: 'sam', text: 'hi'}]};
+var initialize = false;
+var resultsObject = {results: [{objectId: '0', roomname: 'lobby', username: 'DEFAULT', text: 'DEFAULT'}]};
 var objectid = 1;
+
+
 var requestHandler = function(request, response) {
+  if (!initialize) {
+    console.log('get here?')
+    var dataStorageFile = '';
+    fs.readFile(__dirname + '/data.json', function(error, data) {
+      dataStorageFile += data;
+      var dataStorage = JSON.parse('[' + dataStorageFile + ']' );
+      resultsObject = {results: dataStorage};
+    }); //
+    // setInterval ( fs.writeFile(__dirname + '/data.txt', JSON.stringify(resultsObject.results).slice(1, -1), function(error) {
+
+    // }), 3000)   ;
+
+
+    initialize = true;
+  }
   // Request and Response come from node's http module.
   //
   // They include information about both the incoming request, such as
@@ -45,26 +67,12 @@ var requestHandler = function(request, response) {
   // other than plain text, like JSON or HTML.
   headers['Content-Type'] = 'application/json';
 
-  // .writeHead() writes to the request line and headers of the response,
-  // which includes the status and all headers.
-
-  // if (request.method === 'POST') {
-  //   var requestBody = '';
-  //   request.on('data', function(data) {
-  //     requestBody += data;
-  //   });
-  //   request.on('end', function() {
-  //     console.log(requestBody)
-  //     response.writeHead(statusCode, headers);      
-  //     response.end(JSON.stringify(requestBody));
-  //   });
-  // }
   if ( request.url === '/classes/messages') {
     if (request.method === 'OPTIONS') {
       response.writeHead(statusCode, headers);
       response.end();
-
     } else if (request.method === 'GET') {
+
       response.writeHead(statusCode, headers);
       response.end(JSON.stringify(resultsObject));
     } else if (request.method === 'POST') {
@@ -73,20 +81,73 @@ var requestHandler = function(request, response) {
       var requestBody = '';
       request.on('data', function (data) {
         requestBody += data;
+        // fs write to the file
       });
       request.on('end', function() {
         var newMessageObj = JSON.parse(requestBody);
         newMessageObj['objectId'] = objectid;
         objectid++;
         resultsObject.results.push(newMessageObj);
+        fs.appendFile(__dirname + '/data.json', ',' + JSON.stringify(newMessageObj), function(error) {
+          if (error) {
+            console.log('error appendFile');
+          } else {
+            console.log('success appendFile')
+          }
+        });
         response.end(JSON.stringify(resultsObject));
       });
     } //end else for POST
 
+  } else if ( request.url === '/index' || request.url === '/' || request.url.indexOf('?') !== -1 ) {
+    if (request.method === 'OPTIONS') {
+      response.writeHead(statusCode, headers);
+      response.end();
+    } else if ( request.method === 'GET') {
+
+      fs.readFile(__dirname + '/../client/index.html', function(error, data) {
+        headers['Content-Type'] = 'text/html';
+
+        response.writeHead(statusCode, headers);
+        response.write(data);
+        response.end();
+      });
+    }
   } else {
-    statusCode = 404;
-    response.writeHead(statusCode, headers);
-    response.end(JSON.stringify(resultsObject));
+    var filePath = __dirname + '/../client' + request.url;
+
+    var extname = path.extname(filePath);
+    fs.exists(filePath, function(exists) {
+      if (exists) {
+        fs.readFile(filePath, function(error, data) {
+          if (error) {
+            response.writeHead(500, headers);
+            response.end();
+          } else {
+            console.log('at end extname', extname)
+            if ( extname === '.js' ) {
+              headers['Content-Type'] = 'text/javascript';
+            } else if (extname === '.css') {
+              headers['Content-Type'] = 'text/css';
+            }
+            console.log('headers', headers['Content-Type']);
+            console.log('extname before write', extname)
+            response.writeHead(statusCode, headers);
+            response.write(data);
+            response.end();
+          }
+        }); //fs.readFile
+      } else {
+        statusCode = 404;
+        response.writeHead(statusCode, headers); 
+        response.end();
+      }
+
+    });
+
+    // statusCode = 404;
+    // response.writeHead(statusCode, headers);
+    // response.end(JSON.stringify(resultsObject));
   }
 
   // response.writeHead(statusCode, headers);
@@ -104,6 +165,8 @@ var requestHandler = function(request, response) {
   // response.end(JSON.stringify(resultsObject));
 };
 
+
+
 exports.requestHandler = requestHandler;
 // These headers will allow Cross-Origin Resource Sharing (CORS).
 // This code allows this server to talk to websites that
@@ -115,3 +178,19 @@ exports.requestHandler = requestHandler;
 // Another way to get around this restriction is to serve you chat
 // client from this domain by setting up static file serving.
 
+
+
+  // .writeHead() writes to the request line and headers of the response,
+  // which includes the status and all headers.
+
+  // if (request.method === 'POST') {
+  //   var requestBody = '';
+  //   request.on('data', function(data) {
+  //     requestBody += data;
+  //   });
+  //   request.on('end', function() {
+  //     console.log(requestBody)
+  //     response.writeHead(statusCode, headers);      
+  //     response.end(JSON.stringify(requestBody));
+  //   });
+  // }
