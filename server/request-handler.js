@@ -17,7 +17,8 @@ this file and include it in basic-server.js so that it actually works.
 *Hint* Check out the node module documentation at http://nodejs.org/api/modules.html.
 
 **************************************************************/
-var resultsObject = {results: []};
+var resultsObject = {results: [{objectId: '0', roomname: 'lobby', username: 'sam', text: 'hi'}]};
+var objectid = 1;
 var requestHandler = function(request, response) {
   // Request and Response come from node's http module.
   //
@@ -33,10 +34,7 @@ var requestHandler = function(request, response) {
   // debugging help, but you should always be careful about leaving stray
   // console.logs in your code.
   console.log('Serving request type ' + request.method + ' for url ' + request.url);
-
-
   // The outgoing status.
-
   var statusCode = 200;
   // See the note below about CORS headers.
   var headers = defaultCorsHeaders;
@@ -45,7 +43,7 @@ var requestHandler = function(request, response) {
   //
   // You will need to change this if you are sending something
   // other than plain text, like JSON or HTML.
-  headers['Content-Type'] = 'text/JSON';
+  headers['Content-Type'] = 'application/json';
 
   // .writeHead() writes to the request line and headers of the response,
   // which includes the status and all headers.
@@ -62,7 +60,11 @@ var requestHandler = function(request, response) {
   //   });
   // }
   if ( request.url === '/classes/messages') {
-    if (request.method === 'GET') {
+    if (request.method === 'OPTIONS') {
+      response.writeHead(statusCode, headers);
+      response.end();
+
+    } else if (request.method === 'GET') {
       response.writeHead(statusCode, headers);
       response.end(JSON.stringify(resultsObject));
     } else if (request.method === 'POST') {
@@ -73,11 +75,14 @@ var requestHandler = function(request, response) {
         requestBody += data;
       });
       request.on('end', function() {
-        resultsObject.results.push(JSON.parse(requestBody));
+        var newMessageObj = JSON.parse(requestBody);
+        newMessageObj['objectId'] = objectid;
+        objectid++;
+        resultsObject.results.push(newMessageObj);
         response.end(JSON.stringify(resultsObject));
       });
+    } //end else for POST
 
-    }
   } else {
     statusCode = 404;
     response.writeHead(statusCode, headers);
